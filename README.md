@@ -3,10 +3,8 @@
 `labelWise` is an open-source web app to annotate images with bounding boxes and export/import annotations in CSV format.
 
 ## Demo
-- Live preview (placeholder): [https://example.com/labelwise-demo](https://example.com/labelwise-demo)
+- Live preview: [https://label-wise-ashen.vercel.app/](https://label-wise-ashen.vercel.app/)
 - Local preview: [http://localhost:5173](http://localhost:5173)
-
-> If you fork this project, update the live preview URL with your own deployment.
 
 ## Features
 - Multi-image upload.
