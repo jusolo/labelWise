@@ -4,6 +4,7 @@
 
 ## Demo
 - Live preview: [https://label-wise-ashen.vercel.app/](https://label-wise-ashen.vercel.app/)
+- Documentation: [https://jusolo-labelwise.mintlify.app/introduction](https://jusolo-labelwise.mintlify.app/introduction)
 - Local preview: [http://localhost:5173](http://localhost:5173)
 
 ## Features
