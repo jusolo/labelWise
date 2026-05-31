@@ -45,6 +45,7 @@ export type AnnotationTransform = {
 }
 
 export type LabelColor = {
+  hue: number
   solid: string
   soft: string
   overlay: string

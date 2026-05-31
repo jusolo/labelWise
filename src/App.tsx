@@ -2,6 +2,8 @@ import { X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react"
 import { sileo } from "sileo"
 
+import changelogContent from "../CHANGELOG.md?raw"
+import { ChangelogModal } from "@/features/labelwise/components/changelog-modal"
 import { LwSelect } from "@/features/labelwise/components/lw-select"
 import { DEFAULT_LABELS, GRID_SIZE, MIN_BOX_SIZE } from "@/features/labelwise/constants"
 import type {
@@ -13,7 +15,8 @@ import type {
   Point,
   ResizeHandle,
 } from "@/features/labelwise/types"
-import { buildRandomLabelColor } from "@/features/labelwise/utils/color"
+import { buildLabelColor, getDistinctHue, hexToHue, hueToHex } from "@/features/labelwise/utils/color"
+import { deleteStoredImage, loadSession, saveImageFile, saveImageState, saveMeta } from "@/features/labelwise/utils/sessionStore"
 import { parseCsv } from "@/features/labelwise/utils/csv"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,9 +27,14 @@ function App() {
   const [images, setImages] = useState<ImageItem[]>([])
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [labels, setLabels] = useState<string[]>(DEFAULT_LABELS)
-  const [labelColors, setLabelColors] = useState<Record<string, LabelColor>>(() =>
-    Object.fromEntries(DEFAULT_LABELS.map((label) => [label, buildRandomLabelColor()])),
-  )
+  const [labelColors, setLabelColors] = useState<Record<string, LabelColor>>(() => {
+    const acc: Record<string, LabelColor> = {}
+    for (const label of DEFAULT_LABELS) {
+      const hue = getDistinctHue(Object.values(acc).map((c) => c.hue))
+      acc[label] = buildLabelColor(hue)
+    }
+    return acc
+  })
   const [activeLabel, setActiveLabel] = useState<string>("")
   const [newLabel, setNewLabel] = useState("")
   const [bulkLabels, setBulkLabels] = useState("")
@@ -42,6 +50,7 @@ function App() {
   const [pasteCount, setPasteCount] = useState(0)
   const [panelView, setPanelView] = useState<"canvas" | "csv">("canvas")
   const [showGridGuide, setShowGridGuide] = useState(true)
+  const [showChangelog, setShowChangelog] = useState(false)
 
   const imagesRef = useRef<ImageItem[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -50,6 +59,12 @@ function App() {
   const viewportRef = useRef<HTMLDivElement>(null)
   const panStartRef = useRef<{ pointerX: number; pointerY: number; scrollX: number; scrollY: number } | null>(null)
   const [viewportSize, setViewportSize] = useState({ width: 1, height: 1 })
+
+  // Session persistence
+  const sessionLoadedRef = useRef(false)
+  const savedImageFileIdsRef = useRef<Set<string>>(new Set())
+  const metaSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const stateSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const currentImage = useMemo(() => images.find((image) => image.id === currentId) ?? null, [currentId, images])
   const currentAnnotations = currentImage?.annotations ?? []
@@ -77,6 +92,76 @@ function App() {
     imagesRef.current = images
   }, [images])
 
+  // ── Load persisted session on mount ──────────────────────────────────────
+  useEffect(() => {
+    loadSession().then(({ files, states, meta }) => {
+      if (files.length === 0 && !meta) {
+        sessionLoadedRef.current = true
+        return
+      }
+
+      const ordered = meta?.imageOrder ?? files.map((f) => f.id)
+      const fileMap = new Map(files.map((f) => [f.id, f]))
+
+      const restoredImages: ImageItem[] = ordered
+        .filter((id) => fileMap.has(id))
+        .map((id) => {
+          const f = fileMap.get(id)!
+          const s = states.get(id)
+          const file = new File([f.buffer], f.name, { type: f.type, lastModified: f.lastModified })
+          const url = URL.createObjectURL(file)
+          savedImageFileIdsRef.current.add(id)
+          return {
+            id,
+            file,
+            url,
+            annotations: s?.annotations ?? [],
+            width: s?.width,
+            height: s?.height,
+          }
+        })
+
+      if (restoredImages.length > 0) setImages(restoredImages)
+      if (meta) {
+        setLabels(meta.labels)
+        setLabelColors(meta.labelColors)
+        setActiveLabel(meta.activeLabel)
+        setCurrentId(meta.currentId)
+      }
+
+      sessionLoadedRef.current = true
+    }).catch(() => {
+      sessionLoadedRef.current = true
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Persist image states (debounced) ─────────────────────────────────────
+  useEffect(() => {
+    if (!sessionLoadedRef.current) return
+    if (stateSaveTimerRef.current) clearTimeout(stateSaveTimerRef.current)
+    stateSaveTimerRef.current = setTimeout(() => {
+      for (const image of imagesRef.current) {
+        void saveImageState(image.id, { annotations: image.annotations, width: image.width, height: image.height })
+      }
+    }, 600)
+  }, [images])
+
+  // ── Persist meta (debounced) ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!sessionLoadedRef.current) return
+    if (metaSaveTimerRef.current) clearTimeout(metaSaveTimerRef.current)
+    metaSaveTimerRef.current = setTimeout(() => {
+      void saveMeta({
+        labels,
+        labelColors,
+        activeLabel,
+        currentId,
+        imageOrder: imagesRef.current.map((i) => i.id),
+      })
+    }, 600)
+  }, [labels, labelColors, activeLabel, currentId])
+
   useEffect(() => {
     if (labels.length === 0) {
       setActiveLabel("")
@@ -94,7 +179,8 @@ function App() {
       let changed = false
       for (const label of labels) {
         if (!next[label]) {
-          next[label] = buildRandomLabelColor()
+          const hue = getDistinctHue(Object.values(next).map((c) => c.hue))
+          next[label] = buildLabelColor(hue)
           changed = true
         }
       }
@@ -174,6 +260,11 @@ function App() {
       url: URL.createObjectURL(file),
       annotations: [],
     }))
+
+    for (const item of next) {
+      savedImageFileIdsRef.current.add(item.id)
+      void saveImageFile(item.id, item.file)
+    }
 
     setImages((previous) => {
       const updated = [...previous, ...next]
@@ -331,6 +422,9 @@ function App() {
   }
 
   const removeImage = (id: string) => {
+    savedImageFileIdsRef.current.delete(id)
+    void deleteStoredImage(id)
+
     setImages((previous) => {
       const target = previous.find((item) => item.id === id)
       if (target) URL.revokeObjectURL(target.url)
@@ -452,6 +546,11 @@ function App() {
 
   const updateAnnotationLabel = (annotationId: string, nextLabel: string) => {
     updateAnnotation(annotationId, (annotation) => ({ ...annotation, label: nextLabel }))
+  }
+
+  const updateLabelColor = (label: string, hex: string) => {
+    const hue = hexToHue(hex)
+    setLabelColors((previous) => ({ ...previous, [label]: buildLabelColor(hue) }))
   }
 
   const selectSingleAnnotation = (annotationId: string) => {
@@ -1309,6 +1408,37 @@ function App() {
                 )}
               </div>
 
+              {labels.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Colores de etiquetas</p>
+                  <div className="space-y-1.5">
+                    {labels.map((label) => {
+                      const color = labelColors[label]
+                      return (
+                        <label
+                          key={label}
+                          className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-card/70 px-3 py-2 transition-colors hover:border-ring/60"
+                          title={`Cambiar color de "${label}"`}
+                        >
+                          <span
+                            className="h-4 w-4 flex-shrink-0 rounded-full border border-white/20 shadow-sm"
+                            style={{ backgroundColor: color?.solid ?? "#111827" }}
+                          />
+                          <span className="min-w-0 flex-1 truncate text-xs font-medium">{label}</span>
+                          <span className="text-[10px] text-muted-foreground">editar</span>
+                          <input
+                            type="color"
+                            className="sr-only"
+                            value={color ? hueToHex(color.hue) : "#5794f2"}
+                            onChange={(event) => updateLabelColor(label, event.target.value)}
+                          />
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <p className="text-sm font-medium">Cuadros de la imagen</p>
                 {!currentImage && <p className="text-sm text-muted-foreground">Selecciona una imagen para ver sus cuadros.</p>}
@@ -1396,7 +1526,22 @@ function App() {
             </div>
           </div>
         </section>
+
+        <footer className="flex items-center justify-between border-t border-border/60 bg-card/60 px-5 py-2.5 text-xs text-muted-foreground">
+          <span>labelWise <span className="text-foreground/50">v1.0.3</span></span>
+          <button
+            type="button"
+            className="transition-colors hover:text-foreground"
+            onClick={() => setShowChangelog(true)}
+          >
+            Ver changelog
+          </button>
+        </footer>
       </div>
+
+      {showChangelog && (
+        <ChangelogModal content={changelogContent} onClose={() => setShowChangelog(false)} />
+      )}
     </main>
   )
 }
