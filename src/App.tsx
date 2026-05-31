@@ -36,7 +36,6 @@ function App() {
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null)
   const [selectedAnnotationIds, setSelectedAnnotationIds] = useState<string[]>([])
   const [interactionMode, setInteractionMode] = useState<"draw" | "pan">("draw")
-  const [pan, setPan] = useState<Point>({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const [annotationTransform, setAnnotationTransform] = useState<AnnotationTransform | null>(null)
   const [copiedAnnotations, setCopiedAnnotations] = useState<AnnotationBox[] | null>(null)
@@ -49,7 +48,7 @@ function App() {
   const csvInputRef = useRef<HTMLInputElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
-  const panStartRef = useRef<{ pointerX: number; pointerY: number; panX: number; panY: number } | null>(null)
+  const panStartRef = useRef<{ pointerX: number; pointerY: number; scrollX: number; scrollY: number } | null>(null)
   const [viewportSize, setViewportSize] = useState({ width: 1, height: 1 })
 
   const currentImage = useMemo(() => images.find((image) => image.id === currentId) ?? null, [currentId, images])
@@ -109,9 +108,12 @@ function App() {
     setDrawCurrent(null)
     setSelectedAnnotationId(null)
     setSelectedAnnotationIds([])
-    setPan({ x: 0, y: 0 })
     setAnnotationTransform(null)
     setPasteCount(0)
+    if (viewportRef.current) {
+      viewportRef.current.scrollLeft = 0
+      viewportRef.current.scrollTop = 0
+    }
   }, [currentId])
 
   useEffect(() => {
@@ -641,35 +643,23 @@ function App() {
   const safeFitScale = Number.isFinite(fitScale) && fitScale > 0 ? fitScale : 1
   const stageWidth = naturalWidth * safeFitScale * zoom
   const stageHeight = naturalHeight * safeFitScale * zoom
-  const panLimitX = Math.max(0, (stageWidth - viewportSize.width) / 2)
-  const panLimitY = Math.max(0, (stageHeight - viewportSize.height) / 2)
-  const stageLeft = (viewportSize.width - stageWidth) / 2 + pan.x
-  const stageTop = (viewportSize.height - stageHeight) / 2 + pan.y
-
-  const clampPan = (nextPan: Point): Point => ({
-    x: Math.min(panLimitX, Math.max(-panLimitX, nextPan.x)),
-    y: Math.min(panLimitY, Math.max(-panLimitY, nextPan.y)),
-  })
 
   const startPan = (event: MouseEvent<HTMLDivElement>) => {
+    if (!viewportRef.current) return
     panStartRef.current = {
       pointerX: event.clientX,
       pointerY: event.clientY,
-      panX: pan.x,
-      panY: pan.y,
+      scrollX: viewportRef.current.scrollLeft,
+      scrollY: viewportRef.current.scrollTop,
     }
     setIsPanning(true)
   }
 
   const movePan = (event: MouseEvent<HTMLDivElement>) => {
     const start = panStartRef.current
-    if (!start) return
-
-    const next = clampPan({
-      x: start.panX + (event.clientX - start.pointerX),
-      y: start.panY + (event.clientY - start.pointerY),
-    })
-    setPan(next)
+    if (!start || !viewportRef.current) return
+    viewportRef.current.scrollLeft = start.scrollX - (event.clientX - start.pointerX)
+    viewportRef.current.scrollTop = start.scrollY - (event.clientY - start.pointerY)
   }
 
   const finishPan = () => {
@@ -716,11 +706,6 @@ function App() {
     }
     finishDraw()
   }
-
-  useEffect(() => {
-    setPan((previous) => clampPan(previous))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageWidth, stageHeight, viewportSize.width, viewportSize.height])
 
   useEffect(() => {
     if (!annotationTransform) return
@@ -1034,17 +1019,24 @@ function App() {
 
                     <div
                       ref={viewportRef}
-                      className="relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl border border-border/80 bg-muted/70 p-2"
+                      className="min-h-0 min-w-0 flex-1 overflow-auto rounded-2xl border border-border/80 bg-muted/70"
                     >
-                      <div className="absolute inset-0 flex items-center justify-center overflow-hidden p-2">
+                      <div
+                        style={{
+                          minWidth: stageWidth + 32,
+                          minHeight: stageHeight + 32,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: 16,
+                        }}
+                      >
                         <div
                           ref={stageRef}
-                          className={`absolute select-none ${interactionMode === "pan" ? (isPanning ? "cursor-grabbing" : "cursor-grab") : "cursor-crosshair"}`}
+                          className={`relative select-none flex-shrink-0 ${interactionMode === "pan" ? (isPanning ? "cursor-grabbing" : "cursor-grab") : "cursor-crosshair"}`}
                           style={{
                             width: stageWidth,
                             height: stageHeight,
-                            left: stageLeft,
-                            top: stageTop,
                           }}
                           onMouseDown={handleStageMouseDown}
                           onMouseMove={handleStageMouseMove}

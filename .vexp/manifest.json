@@ -1,0 +1,30 @@
+{
+  "file_hashes": {
+    "CONTRIBUTING.md": "646ad345ef7e514144e1168e3d24094e2a5d0d78d39a1d04fc50c8fa9f419269",
+    "README.md": "daa0cee2fe33dca7e5b3ef773ee3c93c84307abea5e25baf59cee3e9e76f7f9e",
+    "eslint.config.js": "579193d443ae70df48e35837dc9bfa6e16599819d8839be81c29604e0a61b8b5",
+    "src/App.tsx": "a5d9a391c258f87acff43c5d600999a3494c7c0ef6b1a2fb8b06e9f53e554e40",
+    "src/components/ui/badge.tsx": "40a335a021ba3b8f9f2a00a8a277fd4476b787a6b816b10071e32af0eee322cb",
+    "src/components/ui/button.tsx": "0b4f3ba0fede8cf811d41a1e1636e0e6b433ba6745905097da121cba099c0f53",
+    "src/components/ui/card.tsx": "a648b34a0a54e4ec57cdd712bc80b8db0298ba870c484d28e484b4b45c86f983",
+    "src/components/ui/input.tsx": "bd6b66176b8b5a9badda726b4a5b74c235a2fdefc5b44691900fb134faebe916",
+    "src/components/ui/textarea.tsx": "af7ff2935c94be16fe887417427e2c1b0840bd43ee93bde5da4a5529b86af0b3",
+    "src/features/labelwise/components/lw-select.tsx": "9435c4a3d39c92754472b361bbb4e1f794067949caee9e5d99b8ad209334e762",
+    "src/features/labelwise/constants.ts": "27b806dfed84e4ae047e9b8551747c66157dd2505508b6e48a996eb89fb95022",
+    "src/features/labelwise/types.ts": "b13eccadd4be789a20a31a8600dd49925243d6d7eac4badc58377a98a4b99cae",
+    "src/features/labelwise/utils/color.ts": "8659efc377dbdc2839cbfc42d365d6b52c4ee80ea9cb858ce3e2c22f81cf4436",
+    "src/features/labelwise/utils/csv.ts": "1f420e47a66d8af0401a68eeca227e8f8cba7603881f713f51f5f7685ead994e",
+    "src/lib/utils.ts": "cb488a6352482fc7a7ded88a7d5312a953f7113b0ca3598e60979a44f75fb3f5",
+    "src/main.tsx": "14105d5b02fe1a0704497f15d5bc3b1ec86fa9269e1793bbfacdf8b39b4a3d03",
+    "vite.config.ts": "380c94d0804fa29e6bd61d974b5f4f0492fe6191d60ae938e4e163349a5efd2b"
+  },
+  "indexed_at_commit": "50d2d55d440715529cfdce6b18762f490886943c",
+  "indexed_at_timestamp": "2026-05-31T04:51:12.029480+00:00",
+  "schema_version": 3,
+  "stats": {
+    "total_edges": 29,
+    "total_files": 17,
+    "total_nodes": 45
+  },
+  "vexp_version": "2.0.21"
+}
